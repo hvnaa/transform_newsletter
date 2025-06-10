@@ -1,126 +1,102 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Clean Email Header Transformer</title>
+    <title>Email Header Transformer</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        textarea { width: 100%; height: 200px; margin: 10px 0; font-family: monospace; }
+        button { 
+            padding: 10px 15px; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 4px; 
+            margin-right: 10px; 
+            margin-bottom: 10px; 
         }
-        textarea {
-            width: 100%;
-            height: 200px;
-            margin: 10px 0;
-            font-family: monospace;
-        }
-        button {
-            padding: 10px 15px;
-            background: #0066ff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-        button:hover {
-            background: #0055dd;
-        }
-        .button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        #copyBtn {
-            background: #4CAF50;
-        }
-        #clearBtn {
-            background: #f44336;
-        }
-        #ipBtn {
-            background: #FF9800;
-        }
+        #transformBtn { background: #0066ff; }
+        #ipBtn { background: #FF9800; }
+        #copyBtn { background: #4CAF50; }
+        #clearBtn { background: #f44336; }
     </style>
 </head>
 <body>
     <h1>Email Header Transformer</h1>
     <textarea id="inputText" placeholder="Paste your email headers here..."></textarea>
-    <div class="button-group">
-        <button onclick="transformText()">Transform Headers</button>
-        <button id="ipBtn" onclick="addIpTag()">Add [IP] to Subject</button>
-        <button id="copyBtn" onclick="copyToClipboard()">Copy Output</button>
-        <button id="clearBtn" onclick="clearAll()">Clear All</button>
+    <div>
+        <button id="transformBtn">Transform Headers</button>
+        <button id="ipBtn">Add [IP] to Subject</button>
+        <button id="copyBtn">Copy Output</button>
+        <button id="clearBtn">Clear All</button>
     </div>
     <textarea id="outputText" placeholder="Transformed headers will appear here..." readonly></textarea>
 
     <script>
-        function transformText() {
-            const input = document.getElementById('inputText').value;
-            let output = input;
-            
-            // 1. Remove Delivered-To through Return-Path section
-            output = output.replace(/Delivered-To:[\s\S]*?Return-Path:.*?(\n|$)/gi, '');
-            
-            // 2. Transform From: address (case insensitive)
-            output = output.replace(/From:(.*?)@[^>]+/gi, 'From:$1@[RDNS]');
-            
-            // 3. Universal Message-ID transformation
-            output = output.replace(/(message-id\s*:\s*<)([^@]+)(@[^>]+>)/gi, 
-                function(match, prefix, messageId, suffix) {
-                    // Insert [EID] at random position (minimum position 1)
-                    const pos = Math.max(1, Math.floor(Math.random() * messageId.length));
-                    return prefix + messageId.slice(0, pos) + '[EID]' + messageId.slice(pos) + suffix;
-                }
-            );
-            
-            document.getElementById('outputText').value = output;
-        }
-        
-        function addIpTag() {
-            const input = document.getElementById('inputText').value;
-            let output = input;
-            
-            // Only add [IP] if Subject line exists and doesn't already have [IP]
-            if (output.match(/^Subject:/im)) {
-                output = output.replace(/^(Subject:[^\n]*?)(\s*\[IP\])?(\s*)$/im, function(match, subject, existingTag) {
-                    if (!existingTag) {
-                        return subject + ' [IP]';
-                    }
-                    return match; // leave as is if already has [IP]
-                });
-                
-                // Update BOTH textareas to keep them in sync
-                document.getElementById('inputText').value = output;
-                document.getElementById('outputText').value = output;
-                
-                // Visual feedback
-                const ipBtn = document.getElementById('ipBtn');
-                ipBtn.textContent = '[IP] Added!';
-                setTimeout(() => {
-                    ipBtn.textContent = 'Add [IP] to Subject';
-                }, 2000);
+        // Main transformation function
+        function transformHeaders(addIP) {
+            let input = document.getElementById("inputText").value;
+            if (!input.trim()) {
+                alert("Please paste email headers first!");
+                return;
             }
+
+            let output = input;
+
+            // Remove Delivered-To and Return-Path
+            output = output.replace(/^Delivered-To:.*\n?/gim, '');
+            output = output.replace(/^Return-Path:.*\n?/gim, '');
+
+            // Replace domain in From with [RDNS]
+            output = output.replace(/(From:.*?@)[^\s>]+/gi, '$1[RDNS]');
+
+            // Insert [EID] randomly into Message-ID
+            output = output.replace(/(Message-ID:\s*<)([^@]+)(@[^>]+>)/gi, function (_, prefix, id, suffix) {
+                const pos = Math.max(1, Math.floor(Math.random() * id.length));
+                return prefix + id.slice(0, pos) + '[EID]' + id.slice(pos) + suffix;
+            });
+
+            // If Add [IP] button, append [IP] to Subject
+            if (addIP) {
+                output = output.replace(/^(Subject:.*?)$/im, function (_, subject) {
+                    return subject.includes('[IP]') ? subject : subject + ' [IP]';
+                });
+            }
+
+            document.getElementById("outputText").value = output;
         }
-        
-        function copyToClipboard() {
-            const outputText = document.getElementById('outputText');
-            outputText.select();
-            document.execCommand('copy');
-            
-            // Visual feedback
-            const copyBtn = document.getElementById('copyBtn');
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => {
-                copyBtn.textContent = 'Copy Output';
-            }, 2000);
-        }
-        
-        function clearAll() {
-            document.getElementById('inputText').value = '';
-            document.getElementById('outputText').value = '';
+
+        // Button actions
+        document.getElementById("transformBtn").addEventListener("click", function () {
+            transformHeaders(false);
+            showFeedback(this, "Done! Headers Transformed");
+        });
+
+        document.getElementById("ipBtn").addEventListener("click", function () {
+            transformHeaders(true);
+            showFeedback(this, "Done! [IP] Added");
+        });
+
+        document.getElementById("copyBtn").addEventListener("click", function () {
+            const output = document.getElementById("outputText");
+            if (!output.value) {
+                alert("Nothing to copy!");
+                return;
+            }
+            output.select();
+            document.execCommand("copy");
+            showFeedback(this, "Copied!");
+        });
+
+        document.getElementById("clearBtn").addEventListener("click", function () {
+            document.getElementById("inputText").value = '';
+            document.getElementById("outputText").value = '';
+        });
+
+        // Feedback handler
+        function showFeedback(button, message) {
+            const original = button.textContent;
+            button.textContent = message;
+            setTimeout(() => button.textContent = original, 2000);
         }
     </script>
 </body>
