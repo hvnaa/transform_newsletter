@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clean Email Header Transformer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 15px;
+            background: #0066ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0055dd;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #copyBtn {
+            background: #4CAF50;
+        }
+        #clearBtn {
+            background: #f44336;
+        }
+        #ipBtn {
+            background: #FF9800;
+        }
+    </style>
+</head>
+<body>
+    <h1>Email Header Transformer</h1>
+    <textarea id="inputText" placeholder="Paste your email headers here..."></textarea>
+    <div class="button-group">
+        <button onclick="transformText()">Transform Headers</button>
+        <button id="ipBtn" onclick="addIpTag()">Add [IP] to Subject</button>
+        <button id="copyBtn" onclick="copyToClipboard()">Copy Output</button>
+        <button id="clearBtn" onclick="clearAll()">Clear All</button>
+    </div>
+    <textarea id="outputText" placeholder="Transformed headers will appear here..." readonly></textarea>
+
+    <script>
+        function transformText() {
+            const input = document.getElementById('inputText').value;
+            let output = input;
+            
+            // 1. Remove Delivered-To through Return-Path section
+            output = output.replace(/Delivered-To:[\s\S]*?Return-Path:.*?(\n|$)/gi, '');
+            
+            // 2. Transform From: address (case insensitive)
+            output = output.replace(/From:(.*?)@[^>]+/gi, 'From:$1@[RDNS]');
+            
+            // 3. Universal Message-ID transformation
+            output = output.replace(/(message-id\s*:\s*<)([^@]+)(@[^>]+>)/gi, 
+                function(match, prefix, messageId, suffix) {
+                    // Insert [EID] at random position (minimum position 1)
+                    const pos = Math.max(1, Math.floor(Math.random() * messageId.length));
+                    return prefix + messageId.slice(0, pos) + '[EID]' + messageId.slice(pos) + suffix;
+                }
+            );
+            
+            document.getElementById('outputText').value = output;
+        }
+        
+        function addIpTag() {
+            const input = document.getElementById('inputText').value;
+            let output = input;
+            
+            // Only add [IP] if Subject line exists and doesn't already have [IP]
+            if (output.match(/^Subject:/im)) {
+                output = output.replace(/^(Subject:[^\n]*?)(\s*\[IP\])?(\s*)$/im, function(match, subject, existingTag) {
+                    if (!existingTag) {
+                        return subject + ' [IP]';
+                    }
+                    return match; // leave as is if already has [IP]
+                });
+                
+                // Update BOTH textareas to keep them in sync
+                document.getElementById('inputText').value = output;
+                document.getElementById('outputText').value = output;
+                
+                // Visual feedback
+                const ipBtn = document.getElementById('ipBtn');
+                ipBtn.textContent = '[IP] Added!';
+                setTimeout(() => {
+                    ipBtn.textContent = 'Add [IP] to Subject';
+                }, 2000);
+            }
+        }
+        
+        function copyToClipboard() {
+            const outputText = document.getElementById('outputText');
+            outputText.select();
+            document.execCommand('copy');
+            
+            // Visual feedback
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = 'Copy Output';
+            }, 2000);
+        }
+        
+        function clearAll() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('outputText').value = '';
+        }
+    </script>
+</body>
+</html>
